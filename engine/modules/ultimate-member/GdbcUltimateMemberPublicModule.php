@@ -41,10 +41,18 @@ final class GdbcUltimateMemberPublicModule extends GdbcBasePublicModule
 		}
 	}
 
+	public function filterFormError( $err, $request_error ) {
+		if ( 'invalid_secure_token' === $request_error ) {
+			$err = __( 'Invalid secure token. Please refresh page and try again.', 'goodbye-captcha' );
+		}
+		return $err;
+	}
+
 	private function registerLoginHooks()
 	{
-		add_action('um_submit_form_errors_hook_login', array($this, 'validateFormEncryptedToken'), 1);
+		add_action('um_submit_form_errors_hook_login', array($this, 'validateFormEncryptedToken'), 1, 2);
 		add_action('um_after_login_fields', array($this, 'renderHiddenFieldIntoForm'));
+		add_filter( 'um_custom_error_message_handler', array($this, 'filterFormError'), 10, 2 );
 
 		if(MchGdbcWpUtils::isAjaxRequest()){
 			add_action('um_after_form', array($this, 'renderRefreshTokensScript'), 10, 1);
@@ -62,14 +70,16 @@ final class GdbcUltimateMemberPublicModule extends GdbcBasePublicModule
 
 	public function registerRegistrationHooks()
 	{
-		add_action('um_submit_form_errors_hook__registration', array($this, 'validateFormEncryptedToken'), 1);
+		add_action('um_submit_form_errors_hook__registration', array($this, 'validateFormEncryptedToken'), 1, 2);
 		add_action('um_after_register_fields', array($this, 'renderHiddenFieldIntoForm'));
+		add_filter( 'um_custom_error_message_handler', array($this, 'filterFormError'), 10, 2 );
 	}
 
 	public function registerLostPasswordHooks()
 	{
-		add_action('um_reset_password_page_hidden_fields', array($this, 'renderHiddenFieldIntoForm'), 10);
+		add_action('um_reset_password_page_hidden_fields', array($this, 'renderHiddenFieldIntoForm'));
 		add_action('um_reset_password_errors_hook',  array($this, 'validateFormEncryptedToken'), 1);
+		add_filter( 'um_custom_error_message_handler', array($this, 'filterFormError'), 10, 2 );
 	}
 
 	public function renderHiddenFieldIntoForm()
@@ -77,34 +87,32 @@ final class GdbcUltimateMemberPublicModule extends GdbcBasePublicModule
 		echo $this->getTokenFieldHtml();
 	}
 
-	public function validateFormEncryptedToken($arrRequestInfo)
+	public function validateFormEncryptedToken($arrRequestInfo, $form_data = null)
 	{
 		if(MchGdbcWpUtils::isUserLoggedIn())
 			return;
 
 		$umSection = !empty($arrRequestInfo['_um_password_reset']) ?  GdbcUltimateMemberAdminModule::OPTION_ULTIMATE_MEMBER_LOST_PASSWORD_FORM : null;
-		if(null === $umSection && !empty($arrRequestInfo['mode']))
+		if(null === $umSection && !empty($form_data['mode']))
 		{
-			('login' === $arrRequestInfo['mode']) ? $umSection = GdbcUltimateMemberAdminModule::OPTION_ULTIMATE_MEMBER_LOGIN_FORM : ('register' === $arrRequestInfo['mode'] ? $umSection =  GdbcUltimateMemberAdminModule::OPTION_ULTIMATE_MEMBER_REGISTER_FORM : null);
+			('login' === $form_data['mode']) ? $umSection = GdbcUltimateMemberAdminModule::OPTION_ULTIMATE_MEMBER_LOGIN_FORM : ('register' === $form_data['mode'] ? $umSection =  GdbcUltimateMemberAdminModule::OPTION_ULTIMATE_MEMBER_REGISTER_FORM : null);
 		}
 
-		global $ultimatemember;
-
-		if(null === $umSection || !isset($ultimatemember->form) || !(class_exists('UM_Form')) || !($ultimatemember->form instanceof UM_Form))
+		if(null === $umSection)
 		{
-			wp_redirect(esc_url(add_query_arg('err', '1')));
+			wp_redirect(esc_url(add_query_arg('err', 'invalid_secure_token')));
 			exit;
 		}
 
 		$this->attemptEntity->SectionId = $this->getOptionIdByOptionName($umSection);
 
 		$arrSubmittedData = array();
-		if(!empty($arrRequestInfo['custom_fields']) && is_serialized($arrRequestInfo['custom_fields']))
+		if(!empty($form_data['custom_fields']) && is_serialized($form_data['custom_fields']))
 		{
-			$arrFields = (array)maybe_unserialize($arrRequestInfo['custom_fields']);
-			unset($arrRequestInfo['custom_fields']);
+			$arrFields = (array)maybe_unserialize($form_data['custom_fields']);
+			unset($form_data['custom_fields']);
 
-			foreach((array)$arrRequestInfo as $formFieldName => $value)
+			foreach((array)$form_data as $formFieldName => $value)
 			{
 				if(!isset($arrFields[$formFieldName]['label']))
 					continue;
@@ -127,7 +135,7 @@ final class GdbcUltimateMemberPublicModule extends GdbcBasePublicModule
 		if(GdbcRequestController::isValid($this->attemptEntity))
 			return;
 
-		wp_redirect(esc_url(add_query_arg('err', '1')));
+		wp_redirect(esc_url(add_query_arg('err', 'invalid_secure_token')));
 		exit;
 	}
 

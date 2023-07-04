@@ -46,7 +46,7 @@ final class GoodByeCaptchaUtils
 
 	public static function isUltimateMemberActivated()
 	{
-		return class_exists('UM_API');
+		return class_exists('UM_API') || class_exists( 'UM' );
 	}
 
 	public static function isUjiCountDownActivated()
@@ -513,12 +513,12 @@ final class GoodByeCaptchaUtils
 		);
 	}
 
-	
+
 	public static function isPostRequestForWPStandardLogin()
 	{
 		return !empty($_POST) && function_exists('login_header') && !MchGdbcWpUtils::isAjaxRequest();
 	}
-	
+
 	public static function isLoginAttemptEntity(GdbcAttemptEntity $attemptEntity)
 	{
 		foreach(self::getAllPossibleLoginAttemptEntities() as $loginAttemptEntity)
